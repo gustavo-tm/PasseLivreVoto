@@ -1,33 +1,31 @@
 import pandas as pd
-from pathlib import Path
-import unidecode as uc
-
-path = str(Path(__file__).resolve().parents[2])
+import zipfile
+import glob
 
 def tidy():
-    abst_1t = (pd.read_excel(path+"/input/raw/abstencao_1t.xlsx").query("nm_pais == 'Brasil'")
-               .rename({"qt_eleitor_abstencao": "abstencao_1t_qt", "sg_uf":"uf"}, axis = 1)
-               .drop(["aa_eleicao", "nm_pais", "nm_regiao", "qt_eleitor_comp"], axis = 1))
-    abst_2t = (pd.read_excel(path+"/input/raw/abstencao_2t.xlsx").query("nm_pais == 'Brasil'")
-               .rename({"qt_eleitor_abstencao": "abstencao_2t_qt", "sg_uf":"uf"}, axis = 1)
-               .drop(["aa_eleicao", "nm_pais", "nm_regiao", "qt_eleitor_comp"], axis = 1))
-                       
-    abst = (pd.merge(abst_1t, abst_2t, on = ["nm_municipio", "uf", "qt_eleitor_apto"])
-            .assign(nm_municipio = lambda _: 
-                        _.nm_municipio.apply(lambda __: 
-                                                 uc.unidecode(__.upper())))
-           .replace({'nm_municipio' : { '-' : " ", "D'OESTE":"DO OESTE", "TERESINHA": "TEREZINHA",
-                                       "IZABEL": "ISABEL"}}, regex = True)
-           .replace({'nm_municipio' : { '-' : " ", "AREZ": "ARES", "CAMACANRI": "CAMACARI", "CAMACA": "CAMACAN",
-                                       "ASSU": "ACU", "BOA SAUDE": "JANUARIO CICCO (BOA SAUDE)",
-                                       "FLORINEA": "FLORINIA", "ELDORADO DOS CARAJAS": "ELDORADO DO CARAJAS",
-                                       "GRACCHO CARDOSO": "GRACHO CARDOSO", "TABOCAO": "FORTALEZA DO TABOCAO",
-                                       "MUQUEM DO SAO FRANCISCO": "MUQUEM DE SAO FRANCISCO",
-                                       "SAO CAITANO": "SAO CAETANO", "SAO LUIS DO PARAITINGA": "SAO LUIZ DO PARAITINGA"}}))
-    
-    municipios = (pd.read_csv(path+"/input/tidy/municipios.csv")
-                   .filter(["id_municipio", "nm_municipio", "uf"]))
-    
-    (pd.merge(abst, municipios, on = ["nm_municipio", "uf"],how = "right")
-     .drop(["nm_municipio", "uf"], axis = 1)
-     .to_csv(path+"/input/tidy/abstencao.csv"))
+    df = (
+        pd.read_csv("input/raw/municipios_brasileiros_tse.csv")
+        .filter(["codigo_tse", "codigo_ibge"])
+        .rename({"codigo_ibge": "id_municipio"}, axis = 1)
+    )
+
+    for file in glob.glob("input/raw/TSE/*"):
+        with zipfile.ZipFile(file) as z:
+            print(file)
+            with z.open(file[14:-4] + ".csv") as f:
+                print(z, f)
+                df = (pd.read_csv(f, encoding= "latin", sep = ";")
+                    .filter(["NR_TURNO", "ANO_ELEICAO", "CD_MUNICIPIO", "QT_APTOS", "QT_COMPARECIMENTO", "QT_ABSTENCAO"])
+                    .groupby(by = ["NR_TURNO", "CD_MUNICIPIO", "ANO_ELEICAO"])
+                    .sum()
+                    .unstack(level = [0, 2])
+                    .T
+                    .reset_index()
+                    .rename({"level_0": "variavel"}, axis = 1)
+                    .assign(coluna = lambda _: _.variavel.str.lower() + "_" + _.NR_TURNO.astype(str) + "t" + "_" + _.ANO_ELEICAO.astype(str))
+                    .set_index("coluna")
+                    .drop(["variavel", "NR_TURNO", "ANO_ELEICAO"], axis = 1).T.reset_index().rename_axis("", axis = 1)
+                    .rename({"CD_MUNICIPIO": "codigo_tse"}, axis = 1)
+                    .merge(df, on = "codigo_tse")
+                    )
+    df.to_csv("input/tidy/abstencao.csv")

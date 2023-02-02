@@ -1,6 +1,4 @@
 {
-    "abstencao_1t_pct" : ["lambda _: _.abstencao_1t_qt/_.qt_eleitor_apto", ["abstencao_1t_qt", "qt_eleitor_apto"]],
-    "abstencao_2t_pct" : ["lambda _: _.abstencao_2t_qt/_.qt_eleitor_apto", ["abstencao_2t_qt", "qt_eleitor_apto"]],
     "densidade_populacional" : ["lambda _: _.populacao_2019 / _.area", ["populacao_2019", "area"]],
     "automovel_pc" : ["lambda _: _.automovel / _.populacao_2019", ["automovel", "populacao_2019"]],
     "moto_pc" : ["lambda _: _.motocicleta / _.populacao_2019", ["motocicleta", "populacao_2019"]],
