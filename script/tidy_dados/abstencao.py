@@ -28,4 +28,5 @@ def tidy():
                     .rename({"CD_MUNICIPIO": "codigo_tse"}, axis = 1)
                     .merge(df, on = "codigo_tse")
                     )
+                    
     df.to_csv("input/tidy/abstencao.csv")
